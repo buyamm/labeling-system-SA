@@ -2,53 +2,73 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Filter, Copy, AlertTriangle, CheckCircle2, Clock, Loader2, Trash2, User, ChevronDown } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { AiLabel, SegmentResult } from '../types';
+import { Sentiment, AspectType, SegmentResult } from '../types';
 import { segmentApi } from '../api/segmentApi';
 import { CustomSelect } from "@/shared/components/CustomSelect";
 
-const MOCK_TYPES = [
-   { id: 0, name: 'Báo chí' },
-  { id: 1, name: 'Thuần phong mỹ tục ' },
-  { id: 2, name: 'Cờ bạc' },
-  { id: 3, name: 'Lừa đảo (vay,tín dụng)' },
-  { id: 4, name: 'Sàn giao dịch tiền ảo ' },
-  { id: 5, name: 'Tổ chức' },
-  { id: 7, name: 'Mạng xã hội, diễn đàn' },
-  { id: 8, name: 'Game trực tuyến ' },
-  { id: 10, name: 'Chính trị' },
-  { id: 9, name: 'Khác' },
-  
+const SENTIMENTS: { value: Sentiment; label: string; color: string }[] = [
+  { value: 'positive', label: 'Positive', color: 'bg-green-600' },
+  { value: 'neutral',  label: 'Neutral',  color: 'bg-yellow-500' },
+  { value: 'negative', label: 'Negative', color: 'bg-red-600' },
 ];
 
-const getTypeName = (typeId: number | null) => {
-  if (typeId === null) return 'Chưa phân loại';
-  const type = MOCK_TYPES.find(t => t.id === typeId);
-  return type ? type.name : `Thể loại ${typeId}`;
-};
+const ASPECTS: { value: AspectType; label: string }[] = [
+  { value: 'Teaching_Skill', label: 'Teaching_Skill' },
+  { value: 'Knowledge',      label: 'Knowledge' },
+  { value: 'Experience',     label: 'Experience' },
+  { value: 'Behavior',       label: 'Behavior' },
+  { value: 'Support',        label: 'Support' },
+  { value: 'Curriculum',     label: 'Curriculum' },
+  { value: 'Materials',      label: 'Materials' },
+  { value: 'Workload',       label: 'Workload' },
+  { value: 'Assignments',    label: 'Assignments' },
+  { value: 'Grading',        label: 'Grading' },
+  { value: 'Exams',          label: 'Exams' },
+  { value: 'Classroom',      label: 'Classroom' },
+  { value: 'Platforms',      label: 'Platforms' },
+  { value: 'General',        label: 'General' },
+  { value: 'Recommendation', label: 'Recommendation' },
+];
 
-const AiBadge = ({ label }: { label: string | null | undefined }) => {
+const getSentimentConfig = (s: Sentiment | null | undefined) =>
+  SENTIMENTS.find(x => x.value === s) ?? null;
+
+const getAspectLabel = (a: AspectType | null | undefined) =>
+  ASPECTS.find(x => x.value === a)?.label ?? (a || 'Chưa phân loại');
+
+
+
+const SentimentBadge = ({ sentiment }: { sentiment: Sentiment | null | undefined }) => {
   const base =
     "inline-flex w-fit items-baseline gap-1.5 rounded px-2 py-1 text-[11px] font-bold tracking-wider uppercase";
-  if (label === 'danger') {
+  if (sentiment === 'negative') {
     return (
       <div className={`${base} bg-red-700 text-white`}>
         <AlertTriangle className="h-3 w-3 shrink-0 translate-y-[1px]" />
-        <span>Vi phạm</span>
+        <span>Negative</span>
       </div>
     );
   }
-  if (label === 'safe') {
+  if (sentiment === 'positive') {
     return (
       <div className={`${base} bg-green-500 text-white`}>
-         <CheckCircle2 className="h-3 w-3 shrink-0 translate-y-[1px]" />
-         <span>Không vi phạm</span>
+        <CheckCircle2 className="h-3 w-3 shrink-0 translate-y-[1px]" />
+        <span>Positive</span>
+      </div>
+    );
+  }
+  if (sentiment === 'neutral') {
+    return (
+      <div className={`${base} bg-yellow-400 text-white`}>
+        <Clock className="h-3 w-3 shrink-0 translate-y-[1px]" />
+        <span>Neutral</span>
       </div>
     );
   }
   return (
-    <div className= {`${base} bg-gray-200 text-gray-600`}>
+    <div className={`${base} bg-gray-200 text-gray-600`}>
       <Clock className="h-3 w-3 shrink-0 translate-y-[1px]" />
-      <span>{label || "chưa gán nhãn"}</span>
+      <span>Unlabeled</span>
     </div>
   );
 };
@@ -103,9 +123,9 @@ export const TranscriptReview = () => {
   const [pagination, setPagination] = useState({ count: 0, totalPages: 1, currentPage: 1, pageSize: 20 });
   const [pageInput, setPageInput] = useState('1');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Unlabeled' | 'Labeled'>('Unlabeled');
-  const [filterLabel, setFilterLabel] = useState<AiLabel | 'All'>('All');
-  const [filterType, setFilterType] = useState<number | 'All'>('All');
-  const [pendingUpdates, setPendingUpdates] = useState<Record<number, Partial<SegmentResult>>>({});
+  const [filterSentiment, setFilterSentiment] = useState<Sentiment | 'All'>('All');
+  const [filterAspect, setFilterAspect] = useState<AspectType | 'All'>('All');
+  const [pendingUpdates, setPendingUpdates] = useState<Record<string, Partial<SegmentResult>>>({});
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [username, setUsername] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -126,29 +146,29 @@ export const TranscriptReview = () => {
     try {
       const isLabeledValue =
         filterStatus === 'Unlabeled' ? 'false' :
-        filterStatus === 'Labeled' ? 'true' : 'All';
+          filterStatus === 'Labeled' ? 'true' : 'All';
 
       const queryParams: any = { page, is_labeled: isLabeledValue };
-      
-      // Trong tab đã gắn nhãn  theo user_label / user_type thay vì label / type của AI
+
+      // Trong tab đã gắn nhãn  theo user_sentiment / user_aspect thay vì label / type của AI
       if (filterStatus === 'Labeled') {
-        queryParams.user_label = filterLabel !== 'All' ? filterLabel : undefined;
-        queryParams.user_type = filterType !== 'All' ? filterType : undefined;
+        queryParams.user_sentiment = filterSentiment !== 'All' ? filterSentiment : undefined;
+        queryParams.user_aspect = filterAspect !== 'All' ? filterAspect : undefined;
       } else {
-        queryParams.label = filterLabel !== 'All' ? filterLabel : undefined;
-        queryParams.type = filterType !== 'All' ? filterType : undefined;
+        queryParams.sentiment = filterSentiment !== 'All' ? filterSentiment : undefined;
+        queryParams.aspect = filterAspect !== 'All' ? filterAspect : undefined;
       }
 
       const json = await segmentApi.getSegments(queryParams);
       setData(json.results);
-      
-      const guessedPageSize = (json.current_page < json.total_pages && json.results.length > 0) 
-        ? json.results.length 
+
+      const guessedPageSize = (json.current_page < json.total_pages && json.results.length > 0)
+        ? json.results.length
         : (pagination.pageSize || 20);
 
-      setPagination({ 
-        count: json.count, 
-        totalPages: json.total_pages, 
+      setPagination({
+        count: json.count,
+        totalPages: json.total_pages,
         currentPage: json.current_page,
         pageSize: guessedPageSize
       });
@@ -160,34 +180,40 @@ export const TranscriptReview = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, filterLabel, filterType]);
+  }, [filterStatus, filterSentiment, filterAspect]);
 
   useEffect(() => { fetchData(1); }, [fetchData]);
 
-  const handleUserUpdate = (id: number, updates: Partial<SegmentResult>) => {
+  const handleUserUpdate = (id: string, updates: Partial<SegmentResult>) => {
     setData(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
     setPendingUpdates(prev => ({ ...prev, [id]: { ...prev[id], ...updates, is_labeled: true } }));
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!window.confirm(`Xóa segment #${id}?`)) return;
-    // TODO: gọi segmentApi.deleteSegment(id) khi có endpoint
-    setData(prev => prev.filter(item => item.id !== id));
-    setPendingUpdates(prev => { const next = { ...prev }; delete next[id]; return next; });
+    try {
+      await segmentApi.deleteSegment(id);
+      setData(prev => prev.filter(item => item.id !== id));
+      setPendingUpdates(prev => { const next = { ...prev }; delete next[id]; return next; });
+      showToast('Đã xóa segment');
+    } catch (err) {
+      console.error('Failed to delete:', err);
+      showToast('Lỗi khi xóa segment', 'error');
+    }
   };
 
   const syncPending = async () => {
-    const idsToSync = Object.keys(pendingUpdates).map(Number);
+    const idsToSync = Object.keys(pendingUpdates);
     if (idsToSync.length === 0) return true;
 
-    // Kiểm tra tính hợp lệ: Phải có đủ user_label VÀ user_type mới cho gửi đi
+    // Kiểm tra tính hợp lệ: Phải có đủ user_sentiment VÀ user_aspect mới cho gửi đi
     const invalidSegments = idsToSync.map(id => data.find(d => d.id === id)).filter(Boolean);
-    const firstInvalid = invalidSegments.find(seg => !seg!.user_label || seg!.user_type === null || seg!.user_type === undefined);
-    
+    const firstInvalid = invalidSegments.find(seg => !seg!.user_sentiment || !seg!.user_aspect);
+
     if (firstInvalid) {
       const idx = data.findIndex(d => d.id === firstInvalid.id);
       if (idx !== -1) setActiveIndex(idx);
-      showToast(`Dòng STT #${idx + 1} chưa điền đủ [Nhãn] và [Thể loại]!`, 'error');
+      showToast(`Dòng STT #${idx + 1} chưa điền đủ [Cảm xúc] và [Khía cạnh]!`, 'error');
       return false; // Ngăn chặn việc lưu và giữ nguyên nút ở pendingUpdates
     }
 
@@ -207,12 +233,12 @@ export const TranscriptReview = () => {
     }
   };
 
-  const handleFilterChange = async (key: 'status' | 'label' | 'type', value: any) => {
+  const handleFilterChange = async (key: 'status' | 'sentiment' | 'aspect', value: any) => {
     const success = await syncPending();
     if (!success) return;
     if (key === 'status') setFilterStatus(value);
-    if (key === 'label') setFilterLabel(value);
-    if (key === 'type') setFilterType(value);
+    if (key === 'sentiment') setFilterSentiment(value);
+    if (key === 'aspect') setFilterAspect(value);
   };
 
   const syncAndNavigate = async (newPage: number) => {
@@ -221,7 +247,12 @@ export const TranscriptReview = () => {
   };
 
   const copyAiPrediction = (segment: SegmentResult) => {
-    handleUserUpdate(segment.id, { user_label: segment.label, user_type: segment.type, is_labeled: true });
+    handleUserUpdate(segment.id, {
+      user_sentiment: segment.sentiment,
+      user_aspect: segment.aspect,
+      note: 'Giữ nguyên kết quả AI',
+      is_labeled: true,
+    });
   };
 
   const handleLogout = () => {
@@ -241,10 +272,12 @@ export const TranscriptReview = () => {
       const segment = data[activeIndex];
       if (!segment) return;
 
-      if (e.key === 's' || e.key === 'S') {
-        handleUserUpdate(segment.id, { user_label: 'safe' });
-      } else if (e.key === 'd' || e.key === 'D') {
-        handleUserUpdate(segment.id, { user_label: 'danger' });
+      if (e.key === 'p' || e.key === 'P') {
+        handleUserUpdate(segment.id, { user_sentiment: 'positive', note: 'Đã check tay' });
+      } else if (e.key === 'n' || e.key === 'N') {
+        handleUserUpdate(segment.id, { user_sentiment: 'negative', note: 'Đã check tay' });
+      } else if (e.key === 'u' || e.key === 'U') {
+        handleUserUpdate(segment.id, { user_sentiment: 'neutral', note: 'Đã check tay' });
       } else if (e.key === 'c' || e.key === 'C') {
         copyAiPrediction(segment);
       } else if (e.key === 'ArrowDown' || e.key === 'j') {
@@ -260,7 +293,7 @@ export const TranscriptReview = () => {
   const paginationControls = (
     <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
       <button disabled={pagination.currentPage <= 1 || loading} onClick={() => syncAndNavigate(pagination.currentPage - 1)} className="flex h-8 w-8 items-center justify-center rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">&lt;</button>
-      
+
       <div className="flex items-center gap-2">
         <span className="text-slate-500 font-normal">Trang</span>
         <input
@@ -325,29 +358,28 @@ export const TranscriptReview = () => {
                 />
               </div>
               <div className="flex flex-col">
-                <label className="mb-1 px-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">Nhãn</label>
+                <label className="mb-1 px-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">Cảm xúc</label>
                 <CustomSelect
-                  value={filterLabel}
-                  onValueChange={(val) => handleFilterChange('label', val)}
+                  value={filterSentiment}
+                  onValueChange={(val) => handleFilterChange('sentiment', val)}
                   placeholder="Lọc nhãn"
                   className="h-[34px] w-[150px] border-0 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-blue-600"
                   options={[
                     { label: 'Tất cả', value: 'All' },
-                    { label: 'Không vi phạm', value: 'safe' },
-                    { label: 'Vi phạm', value: 'danger' },
+                    ...SENTIMENTS.map(s => ({ label: s.label, value: s.value })),
                   ]}
                 />
               </div>
               <div className="flex flex-col">
-                <label className="mb-1 px-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">Thể loại</label>
+                <label className="mb-1 px-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">Khía cạnh</label>
                 <CustomSelect
-                  value={filterType.toString()}
-                  onValueChange={(val) => handleFilterChange('type', val === 'All' ? 'All' : Number(val))}
+                  value={filterAspect}
+                  onValueChange={(val) => handleFilterChange('aspect', val)}
                   placeholder="Lọc thể loại"
                   className="h-[34px] w-[200px] border-0 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-blue-600"
                   options={[
                     { label: 'Tất cả', value: 'All' },
-                    ...MOCK_TYPES.map(t => ({ label: t.name, value: t.id.toString() }))
+                    ...ASPECTS.map(a => ({ label: a.label, value: a.value }))
                   ]}
                 />
               </div>
@@ -366,7 +398,7 @@ export const TranscriptReview = () => {
         {/* Keyboard shortcut hint */}
         <div className="mb-3 flex items-center gap-3 text-[11px] text-slate-400">
           <span>Phím tắt</span>
-          {[['S', 'Không vi phạm'], ['D', 'Vi phạm'], ['C', 'Sử dụng kết quả AI'], ['↑↓', 'Di chuyển']].map(([key, label]) => (
+          {[['P', 'Tích cực'], ['N', 'Tiêu cực'], ['U', 'Trung lập'], ['C', 'Sử dụng kết quả AI'], ['↑↓', 'Di chuyển']].map(([key, label]) => (
             <span key={key} className="flex items-center gap-1">
               <kbd className="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-600 shadow-sm">{key}</kbd>
               <span>{label}</span>
@@ -407,8 +439,8 @@ export const TranscriptReview = () => {
                 const isLabeled = segment.is_labeled || !!pendingUpdates[segment.id];
 
                 let borderColor = 'border-l-slate-300';
-                if (segment.label === 'danger') borderColor = 'border-l-red-600';
-                if (segment.label === 'safe') borderColor = 'border-l-green-400';
+                if (segment.sentiment === 'negative') borderColor = 'border-l-red-500';
+                if (segment.sentiment === 'positive') borderColor = 'border-l-green-400';
 
                 return (
                   <div
@@ -428,56 +460,53 @@ export const TranscriptReview = () => {
                     <div className="text-center font-medium text-slate-500 text-sm">
                       <div className="flex flex-col items-center gap-1">
                         {isLabeled && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                          <span className="text-sm font-bold">{index + 1}</span>
-                        <span className="text-[10px] text-slate-400">ID: {segment.id}</span>
-                        <span className="text-[10px] text-slate-400">Đoạn {segment.segment_id}</span>
+                        <span className="text-sm font-bold">{index + 1}</span>
                       </div>
                     </div>
 
                     {/* Content Column */}
                     <div className="pr-4">
-                      <p className="text-[15px] leading-relaxed text-slate-900">{segment.content}</p>
-                      {segment.domain ? (
-                        <a
-                          href={segment.domain.startsWith('http') ? segment.domain : `https://${segment.domain}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="mt-2 inline-block text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-mono"
-                          title={`Mở ${segment.domain} trong tab mới`}
-                        >
-                          {segment.domain}
-                        </a>
-                      ) : null}
+                      <p className="text-[15px] leading-relaxed text-slate-900">{segment.text}</p>
+                      {segment.confidence != null && (
+                        <span className="mt-2 inline-block text-[11px] text-slate-400 font-mono">
+                          Confidence: {(segment.confidence * 100).toFixed(0)}%
+                        </span>
+                      )}
                     </div>
 
                     {/* AI Intelligence Column */}
                     <div className="flex flex-col items-center gap-2 border-l border-slate-100 px-2 h-full justify-center text-center">
-                      <AiBadge label={segment.label} />
-                      <span className="text-sm font-medium text-slate-900 mt-1">{getTypeName(segment.type)}</span>
+                      <SentimentBadge sentiment={segment.sentiment} />
+                      <span className="text-sm font-medium text-slate-900 mt-1">{getAspectLabel(segment.aspect)}</span>
                     </div>
 
                     {/* User Verification Column */}
                     <div className="flex flex-col gap-3 px-2" onClick={e => e.stopPropagation()}>
                       <div className="flex w-full items-stretch rounded bg-slate-100 p-1 text-sm shadow-inner">
-                        <button
-                          onClick={() => handleUserUpdate(segment.id, { user_label: 'safe' })}
-                          className={cn("flex-1 flex items-center justify-center rounded py-2 px-1 text-center font-semibold transition-all uppercase text-xs", segment.user_label === 'safe' ? "bg-green-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-200/50 hover:text-slate-900")}
-                        >Không vi phạm</button>
-                        <button
-                          onClick={() => handleUserUpdate(segment.id, { user_label: 'danger' })}
-                          className={cn("flex-1 flex items-center justify-center rounded py-2 px-1 text-center font-semibold transition-all uppercase text-xs", segment.user_label === 'danger' ? "bg-red-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-200/50 hover:text-slate-900")}
-                        >Vi phạm</button>
+                        {SENTIMENTS.map(s => (
+                          <button
+                            key={s.value}
+                            onClick={() => handleUserUpdate(segment.id, { user_sentiment: s.value, note: 'Đã check tay' })}
+                            className={cn(
+                              "flex-1 flex items-center justify-center rounded py-1.5 px-1 text-center font-semibold transition-all uppercase text-[10px]",
+                              segment.user_sentiment === s.value
+                                ? `${s.color} text-white shadow-sm`
+                                : "text-slate-700 hover:bg-slate-200/50 hover:text-slate-900"
+                            )}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
                       </div>
                       <div className="relative">
                         <CustomSelect
-                          value={segment.user_type?.toString()}
-                          onValueChange={(val) => handleUserUpdate(segment.id, { user_type: val ? Number(val) : null })}
-                          placeholder="Chọn thể loại"
+                          value={segment.user_aspect ?? undefined}
+                          onValueChange={(val) => handleUserUpdate(segment.id, { user_aspect: val as AspectType, note: segment.note || 'Đã check tay' })}
+                          placeholder="Chọn khía cạnh"
                           className="w-full appearance-none rounded-md border-slate-300 bg-white border shadow-sm font-medium text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 justify-between"
-                          options={MOCK_TYPES.map(t => ({ label: t.name, value: t.id.toString() }))}
+                          options={ASPECTS.map(a => ({ label: a.label, value: a.value }))}
                         />
-                        {segment.user_type !== null && segment.user_type !== segment.type && segment.type !== null && (
+                        {segment.user_aspect && segment.user_aspect !== segment.aspect && segment.aspect !== null && (
                           <div className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-white shadow-sm" title="Khác với AI">
                             <span className="text-[10px] font-bold">!</span>
                           </div>
@@ -527,7 +556,7 @@ export const TranscriptReview = () => {
             </span>
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <button disabled={pagination.currentPage <= 1 || loading} onClick={() => syncAndNavigate(pagination.currentPage - 1)} className="flex h-8 w-8 items-center justify-center rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">&lt;</button>
-              
+
               <div className="flex items-center gap-2">
                 <span className="text-slate-500 font-normal">Trang</span>
                 <input

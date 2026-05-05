@@ -1,20 +1,38 @@
-export type AiLabel = 'safe' | 'danger';
+export type Sentiment = 'negative' | 'neutral' | 'positive';
+
+export type AspectType =
+  | 'Teaching_Skill'
+  | 'Knowledge'
+  | 'Experience'
+  | 'Behavior'
+  | 'Support'
+  | 'Curriculum'
+  | 'Materials'
+  | 'Workload'
+  | 'Assignments'
+  | 'Grading'
+  | 'Exams'
+  | 'Classroom'
+  | 'Platforms'
+  | 'General'
+  | 'Recommendation';
 
 export interface ContentType {
-  id: number;
+  id: string;
   name: string;
 }
 
 export interface SegmentResult {
-  id: number;
-  domain: string;
-  segment_id: number;
-  content: string;
-  label: AiLabel;
-  type: number | null;
+  id: string;           // MongoDB ObjectId as string
+  text: string;
+  aspect: AspectType | null;
+  sentiment: Sentiment | null;
+  confidence: number;
+  entity: string | null;
+  aspect_raw: string | null;
+  user_aspect: AspectType | null;
+  user_sentiment: Sentiment | null;
   note: string | null;
-  user_label: 'safe' | 'danger' | null;
-  user_type: number | null;
   is_labeled: boolean;
   created_at: string;
   updated_at: string;
