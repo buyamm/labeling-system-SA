@@ -1,4 +1,4 @@
-import { SegmentResult, PaginatedResponse } from '../types';
+import { SegmentResult, PaginatedResponse, CollectionInfo } from '../types';
 
 // ---------------------------------------------------------------------------
 // API client — calls Next.js API routes which talk to MongoDB Atlas
@@ -11,6 +11,7 @@ export interface GetSegmentsParams {
   aspect?: string;
   user_sentiment?: string;
   user_aspect?: string;
+  collection?: string;
 }
 
 const BASE = '/api/segments';
@@ -46,8 +47,9 @@ export const segmentApi = {
   },
 
   /** PATCH /api/segments/:id — update a single segment */
-  updateSegment: (id: string, data: Partial<SegmentResult>): Promise<SegmentResult> => {
-    return apiFetch<SegmentResult>(`${BASE}/${id}`, {
+  updateSegment: (id: string, data: Partial<SegmentResult>, collection?: string): Promise<SegmentResult> => {
+    const qs = collection ? `?collection=${encodeURIComponent(collection)}` : '';
+    return apiFetch<SegmentResult>(`${BASE}/${id}${qs}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -55,18 +57,41 @@ export const segmentApi = {
 
   /** POST /api/segments/bulk-update — update multiple segments at once */
   bulkUpdateSegments: (
-    updates: Array<Partial<SegmentResult> & { id: string }>
+    updates: Array<Partial<SegmentResult> & { id: string }>,
+    collection?: string
   ): Promise<{ updated: number }> => {
-    return apiFetch<{ updated: number }>(`${BASE}/bulk-update`, {
+    const qs = collection ? `?collection=${encodeURIComponent(collection)}` : '';
+    return apiFetch<{ updated: number }>(`${BASE}/bulk-update${qs}`, {
       method: 'POST',
       body: JSON.stringify(updates),
     });
   },
 
   /** DELETE /api/segments/:id */
-  deleteSegment: (id: string): Promise<{ success: boolean }> => {
-    return apiFetch<{ success: boolean }>(`${BASE}/${id}`, {
+  deleteSegment: (id: string, collection?: string): Promise<{ success: boolean }> => {
+    const qs = collection ? `?collection=${encodeURIComponent(collection)}` : '';
+    return apiFetch<{ success: boolean }>(`${BASE}/${id}${qs}`, {
       method: 'DELETE',
+    });
+  },
+};
+
+export const collectionApi = {
+  /** GET /api/collections — list all collections */
+  getCollections: (): Promise<CollectionInfo[]> => {
+    return apiFetch<CollectionInfo[]>('/api/collections');
+  },
+
+  /** POST /api/import — import CSV into a collection */
+  importCSV: (collection: string, csvText: string): Promise<{
+    inserted: number;
+    total_rows: number;
+    errors: string[];
+    collection: string;
+  }> => {
+    return apiFetch('/api/import', {
+      method: 'POST',
+      body: JSON.stringify({ collection, csvText }),
     });
   },
 };

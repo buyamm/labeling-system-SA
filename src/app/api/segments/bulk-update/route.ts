@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-const COLLECTION = 'segments';
+const DEFAULT_COLLECTION = 'segments';
 
-// POST /api/segments/bulk-update
+// POST /api/segments/bulk-update?collection=<name>
 export async function POST(req: NextRequest) {
     try {
+        const collectionName = req.nextUrl.searchParams.get('collection') || DEFAULT_COLLECTION;
+
         const db = await getDb();
-        const col = db.collection(COLLECTION);
+        const col = db.collection(collectionName);
 
         const updates: Array<{ id: string;[key: string]: any }> = await req.json();
 

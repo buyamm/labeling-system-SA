@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Filter, Copy, AlertTriangle, CheckCircle2, Clock, Loader2, Trash2, User, ChevronDown } from 'lucide-react';
+import { Filter, Copy, AlertTriangle, CheckCircle2, Clock, Loader2, Trash2, User, ChevronDown, Database } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { Sentiment, AspectType, SegmentResult } from '../types';
-import { segmentApi } from '../api/segmentApi';
+import { Sentiment, AspectType, SegmentResult, CollectionInfo } from '../types';
+import { segmentApi, collectionApi } from '../api/segmentApi';
 import { CustomSelect } from "@/shared/components/CustomSelect";
 
 const SENTIMENTS: { value: Sentiment; label: string; color: string }[] = [
@@ -13,21 +13,17 @@ const SENTIMENTS: { value: Sentiment; label: string; color: string }[] = [
 ];
 
 const ASPECTS: { value: AspectType; label: string }[] = [
-  { value: 'Teaching_Skill', label: 'Teaching_Skill' },
-  { value: 'Knowledge',      label: 'Knowledge' },
-  { value: 'Experience',     label: 'Experience' },
-  { value: 'Behavior',       label: 'Behavior' },
-  { value: 'Support',        label: 'Support' },
-  { value: 'Curriculum',     label: 'Curriculum' },
-  { value: 'Materials',      label: 'Materials' },
-  { value: 'Workload',       label: 'Workload' },
-  { value: 'Assignments',    label: 'Assignments' },
-  { value: 'Grading',        label: 'Grading' },
-  { value: 'Exams',          label: 'Exams' },
-  { value: 'Classroom',      label: 'Classroom' },
-  { value: 'Platforms',      label: 'Platforms' },
-  { value: 'General',        label: 'General' },
-  { value: 'Recommendation', label: 'Recommendation' },
+  { value: 'ky_nang_giang_day', label: 'Kỹ năng giảng dạy' },
+  { value: 'kinh_nghiem',       label: 'Kinh nghiệm' },
+  { value: 'hanh_vi',           label: 'Hành vi' },
+  { value: 'bai_tap',           label: 'Bài tập' },
+  { value: 'cham_diem',         label: 'Chấm điểm' },
+  { value: 'cung_cap_tai_lieu', label: 'Cung cấp tài liệu' },
+  { value: 'kien_thuc',         label: 'Kiến thức' },
+  { value: 'chuong_trinh_hoc',  label: 'Chương trình học' },
+  { value: 'thiet_bi_day_hoc',  label: 'Thiết bị dạy học' },
+  { value: 'de_xuat',           label: 'Đề xuất' },
+  { value: 'noi_chung',         label: 'Nói chung' },
 ];
 
 const getSentimentConfig = (s: Sentiment | null | undefined) =>
@@ -36,80 +32,35 @@ const getSentimentConfig = (s: Sentiment | null | undefined) =>
 const getAspectLabel = (a: AspectType | null | undefined) =>
   ASPECTS.find(x => x.value === a)?.label ?? (a || 'Chưa phân loại');
 
-
-
 const SentimentBadge = ({ sentiment }: { sentiment: Sentiment | null | undefined }) => {
-  const base =
-    "inline-flex w-fit items-baseline gap-1.5 rounded px-2 py-1 text-[11px] font-bold tracking-wider uppercase";
-  if (sentiment === 'negative') {
-    return (
-      <div className={`${base} bg-red-700 text-white`}>
-        <AlertTriangle className="h-3 w-3 shrink-0 translate-y-[1px]" />
-        <span>Negative</span>
-      </div>
-    );
-  }
-  if (sentiment === 'positive') {
-    return (
-      <div className={`${base} bg-green-500 text-white`}>
-        <CheckCircle2 className="h-3 w-3 shrink-0 translate-y-[1px]" />
-        <span>Positive</span>
-      </div>
-    );
-  }
-  if (sentiment === 'neutral') {
-    return (
-      <div className={`${base} bg-yellow-400 text-white`}>
-        <Clock className="h-3 w-3 shrink-0 translate-y-[1px]" />
-        <span>Neutral</span>
-      </div>
-    );
-  }
-  return (
-    <div className={`${base} bg-gray-200 text-gray-600`}>
-      <Clock className="h-3 w-3 shrink-0 translate-y-[1px]" />
-      <span>Unlabeled</span>
-    </div>
-  );
+  const base = "inline-flex w-fit items-baseline gap-1.5 rounded px-2 py-1 text-[11px] font-bold tracking-wider uppercase";
+  if (sentiment === 'negative') return <div className={`${base} bg-red-700 text-white`}><AlertTriangle className="h-3 w-3 shrink-0 translate-y-[1px]" /><span>Negative</span></div>;
+  if (sentiment === 'positive') return <div className={`${base} bg-green-500 text-white`}><CheckCircle2 className="h-3 w-3 shrink-0 translate-y-[1px]" /><span>Positive</span></div>;
+  if (sentiment === 'neutral')  return <div className={`${base} bg-yellow-400 text-white`}><Clock className="h-3 w-3 shrink-0 translate-y-[1px]" /><span>Neutral</span></div>;
+  return <div className={`${base} bg-gray-200 text-gray-600`}><Clock className="h-3 w-3 shrink-0 translate-y-[1px]" /><span>Unlabeled</span></div>;
 };
 
-// User dropdown component
 const UserMenu = ({ username, onLogout }: { username: string; onLogout: () => void }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
   return (
     <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white">
-          <User className="h-4 w-4" />
-        </div>
+      <button onClick={() => setOpen(v => !v)} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white"><User className="h-4 w-4" /></div>
         <span>{username}</span>
         <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", open && "rotate-180")} />
       </button>
-
       {open && (
         <div className="absolute right-0 top-full mt-2 w-44 rounded-lg border border-slate-200 bg-white py-1 shadow-lg z-50">
           <div className="border-b border-slate-100 px-4 py-2 text-xs text-slate-400">Đăng nhập với</div>
           <div className="px-4 py-2 text-sm font-semibold text-slate-700">{username}</div>
           <div className="border-t border-slate-100 pt-1">
-            <button
-              onClick={onLogout}
-              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
-            >
-              Đăng xuất
-            </button>
+            <button onClick={onLogout} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors">Đăng xuất</button>
           </div>
         </div>
       )}
@@ -129,6 +80,9 @@ export const TranscriptReview = () => {
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [username, setUsername] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [collections, setCollections] = useState<CollectionInfo[]>([]);
+  const [selectedCollection, setSelectedCollection] = useState<string>('segments');
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -141,6 +95,15 @@ export const TranscriptReview = () => {
     }
   }, []);
 
+  // Load collections list
+  useEffect(() => {
+    setCollectionsLoading(true);
+    collectionApi.getCollections()
+      .then(cols => setCollections(cols))
+      .catch(err => console.error('Failed to load collections:', err))
+      .finally(() => setCollectionsLoading(false));
+  }, []);
+
   const fetchData = useCallback(async (page: number) => {
     setLoading(true);
     try {
@@ -148,9 +111,8 @@ export const TranscriptReview = () => {
         filterStatus === 'Unlabeled' ? 'false' :
           filterStatus === 'Labeled' ? 'true' : 'All';
 
-      const queryParams: any = { page, is_labeled: isLabeledValue };
+      const queryParams: any = { page, is_labeled: isLabeledValue, collection: selectedCollection };
 
-      // Trong tab đã gắn nhãn  theo user_sentiment / user_aspect thay vì label / type của AI
       if (filterStatus === 'Labeled') {
         queryParams.user_sentiment = filterSentiment !== 'All' ? filterSentiment : undefined;
         queryParams.user_aspect = filterAspect !== 'All' ? filterAspect : undefined;
@@ -180,7 +142,7 @@ export const TranscriptReview = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, filterSentiment, filterAspect]);
+  }, [filterStatus, filterSentiment, filterAspect, selectedCollection]);
 
   useEffect(() => { fetchData(1); }, [fetchData]);
 
@@ -192,7 +154,7 @@ export const TranscriptReview = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm(`Xóa segment #${id}?`)) return;
     try {
-      await segmentApi.deleteSegment(id);
+      await segmentApi.deleteSegment(id, selectedCollection);
       setData(prev => prev.filter(item => item.id !== id));
       setPendingUpdates(prev => { const next = { ...prev }; delete next[id]; return next; });
       showToast('Đã xóa segment');
@@ -206,7 +168,6 @@ export const TranscriptReview = () => {
     const idsToSync = Object.keys(pendingUpdates);
     if (idsToSync.length === 0) return true;
 
-    // Kiểm tra tính hợp lệ: Phải có đủ user_sentiment VÀ user_aspect mới cho gửi đi
     const invalidSegments = idsToSync.map(id => data.find(d => d.id === id)).filter(Boolean);
     const firstInvalid = invalidSegments.find(seg => !seg!.user_sentiment || !seg!.user_aspect);
 
@@ -214,12 +175,15 @@ export const TranscriptReview = () => {
       const idx = data.findIndex(d => d.id === firstInvalid.id);
       if (idx !== -1) setActiveIndex(idx);
       showToast(`Dòng STT #${idx + 1} chưa điền đủ [Cảm xúc] và [Khía cạnh]!`, 'error');
-      return false; // Ngăn chặn việc lưu và giữ nguyên nút ở pendingUpdates
+      return false;
     }
 
     setLoading(true);
     try {
-      await segmentApi.bulkUpdateSegments(idsToSync.map(id => ({ id, ...pendingUpdates[id] })));
+      await segmentApi.bulkUpdateSegments(
+        idsToSync.map(id => ({ id, ...pendingUpdates[id] })),
+        selectedCollection
+      );
       setPendingUpdates({});
       setLoading(false);
       showToast('Đã lưu tự động');
@@ -239,6 +203,15 @@ export const TranscriptReview = () => {
     if (key === 'status') setFilterStatus(value);
     if (key === 'sentiment') setFilterSentiment(value);
     if (key === 'aspect') setFilterAspect(value);
+  };
+
+  const handleCollectionChange = async (newCollection: string) => {
+    const success = await syncPending();
+    if (!success) return;
+    setSelectedCollection(newCollection);
+    setFilterStatus('Unlabeled');
+    setFilterSentiment('All');
+    setFilterAspect('All');
   };
 
   const syncAndNavigate = async (newPage: number) => {
@@ -262,29 +235,18 @@ export const TranscriptReview = () => {
     window.location.href = '/login';
   };
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ignore if user is typing in input/textarea/select
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-
       const segment = data[activeIndex];
       if (!segment) return;
-
-      if (e.key === 'p' || e.key === 'P') {
-        handleUserUpdate(segment.id, { user_sentiment: 'positive', note: 'Đã check tay' });
-      } else if (e.key === 'n' || e.key === 'N') {
-        handleUserUpdate(segment.id, { user_sentiment: 'negative', note: 'Đã check tay' });
-      } else if (e.key === 'u' || e.key === 'U') {
-        handleUserUpdate(segment.id, { user_sentiment: 'neutral', note: 'Đã check tay' });
-      } else if (e.key === 'c' || e.key === 'C') {
-        copyAiPrediction(segment);
-      } else if (e.key === 'ArrowDown' || e.key === 'j') {
-        setActiveIndex(i => Math.min(i + 1, data.length - 1));
-      } else if (e.key === 'ArrowUp' || e.key === 'k') {
-        setActiveIndex(i => Math.max(i - 1, 0));
-      }
+      if (e.key === 'p' || e.key === 'P') handleUserUpdate(segment.id, { user_sentiment: 'positive', note: 'Đã check tay' });
+      else if (e.key === 'n' || e.key === 'N') handleUserUpdate(segment.id, { user_sentiment: 'negative', note: 'Đã check tay' });
+      else if (e.key === 'u' || e.key === 'U') handleUserUpdate(segment.id, { user_sentiment: 'neutral', note: 'Đã check tay' });
+      else if (e.key === 'c' || e.key === 'C') copyAiPrediction(segment);
+      else if (e.key === 'ArrowDown' || e.key === 'j') setActiveIndex(i => Math.min(i + 1, data.length - 1));
+      else if (e.key === 'ArrowUp' || e.key === 'k') setActiveIndex(i => Math.max(i - 1, 0));
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -293,38 +255,17 @@ export const TranscriptReview = () => {
   const paginationControls = (
     <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
       <button disabled={pagination.currentPage <= 1 || loading} onClick={() => syncAndNavigate(pagination.currentPage - 1)} className="flex h-8 w-8 items-center justify-center rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">&lt;</button>
-
       <div className="flex items-center gap-2">
         <span className="text-slate-500 font-normal">Trang</span>
         <input
-          type="number"
-          min={1}
-          max={pagination.totalPages || 1}
-          value={pageInput}
+          type="number" min={1} max={pagination.totalPages || 1} value={pageInput}
           onChange={(e) => setPageInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              const p = parseInt(pageInput);
-              if (!isNaN(p) && p >= 1 && p <= pagination.totalPages && p !== pagination.currentPage) {
-                syncAndNavigate(p);
-              } else {
-                setPageInput(pagination.currentPage.toString());
-              }
-            }
-          }}
-          onBlur={() => {
-            const p = parseInt(pageInput);
-            if (!isNaN(p) && p >= 1 && p <= pagination.totalPages && p !== pagination.currentPage) {
-              syncAndNavigate(p);
-            } else {
-              setPageInput(pagination.currentPage.toString());
-            }
-          }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { const p = parseInt(pageInput); if (!isNaN(p) && p >= 1 && p <= pagination.totalPages && p !== pagination.currentPage) syncAndNavigate(p); else setPageInput(pagination.currentPage.toString()); } }}
+          onBlur={() => { const p = parseInt(pageInput); if (!isNaN(p) && p >= 1 && p <= pagination.totalPages && p !== pagination.currentPage) syncAndNavigate(p); else setPageInput(pagination.currentPage.toString()); }}
           className="w-14 rounded-md border border-slate-300 py-1 text-center text-sm font-semibold text-blue-700 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
         <span className="text-slate-500 font-normal">/ {pagination.totalPages}</span>
       </div>
-
       <button disabled={pagination.currentPage >= pagination.totalPages || loading} onClick={() => syncAndNavigate(pagination.currentPage + 1)} className="flex h-8 w-8 items-center justify-center rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">&gt;</button>
     </div>
   );
@@ -333,55 +274,27 @@ export const TranscriptReview = () => {
     <div className="min-h-screen bg-slate-50 p-4 lg:p-8 text-slate-800 font-sans">
       <div className="mx-auto w-full">
         {/* HEADER */}
-        <div className="mb-8 flex items-center justify-between gap-4">
-          {/* Left: Title */}
+        <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-slate-900 uppercase">Hệ thống gán nhãn</h1>
           </div>
-
-          {/* Right: Filters + User */}
           <div className="flex items-center gap-3">
             {/* FILTER CONTROLS */}
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-100/50 p-2 shadow-sm">
               <div className="flex flex-col">
                 <label className="mb-1 px-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">Trạng thái</label>
-                <CustomSelect
-                  value={filterStatus}
-                  onValueChange={(val) => handleFilterChange('status', val)}
-                  placeholder="Lọc trạng thái"
-                  className="h-[34px] w-[140px] border-0 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-blue-600"
-                  options={[
-                    { label: 'Tất cả', value: 'All' },
-                    { label: 'Chưa gán nhãn', value: 'Unlabeled' },
-                    { label: 'Đã gán nhãn', value: 'Labeled' },
-                  ]}
-                />
+                <CustomSelect value={filterStatus} onValueChange={(val) => handleFilterChange('status', val)} placeholder="Lọc trạng thái" className="h-[34px] w-[140px] border-0 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-blue-600"
+                  options={[{ label: 'Tất cả', value: 'All' }, { label: 'Chưa gán nhãn', value: 'Unlabeled' }, { label: 'Đã gán nhãn', value: 'Labeled' }]} />
               </div>
               <div className="flex flex-col">
                 <label className="mb-1 px-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">Cảm xúc</label>
-                <CustomSelect
-                  value={filterSentiment}
-                  onValueChange={(val) => handleFilterChange('sentiment', val)}
-                  placeholder="Lọc nhãn"
-                  className="h-[34px] w-[150px] border-0 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-blue-600"
-                  options={[
-                    { label: 'Tất cả', value: 'All' },
-                    ...SENTIMENTS.map(s => ({ label: s.label, value: s.value })),
-                  ]}
-                />
+                <CustomSelect value={filterSentiment} onValueChange={(val) => handleFilterChange('sentiment', val)} placeholder="Lọc nhãn" className="h-[34px] w-[150px] border-0 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-blue-600"
+                  options={[{ label: 'Tất cả', value: 'All' }, ...SENTIMENTS.map(s => ({ label: s.label, value: s.value }))]} />
               </div>
               <div className="flex flex-col">
                 <label className="mb-1 px-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">Khía cạnh</label>
-                <CustomSelect
-                  value={filterAspect}
-                  onValueChange={(val) => handleFilterChange('aspect', val)}
-                  placeholder="Lọc thể loại"
-                  className="h-[34px] w-[200px] border-0 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-blue-600"
-                  options={[
-                    { label: 'Tất cả', value: 'All' },
-                    ...ASPECTS.map(a => ({ label: a.label, value: a.value }))
-                  ]}
-                />
+                <CustomSelect value={filterAspect} onValueChange={(val) => handleFilterChange('aspect', val)} placeholder="Lọc thể loại" className="h-[34px] w-[200px] border-0 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-blue-600"
+                  options={[{ label: 'Tất cả', value: 'All' }, ...ASPECTS.map(a => ({ label: a.label, value: a.value }))]} />
               </div>
               <div className="flex h-full flex-col justify-end pt-[18px]">
                 <button title="Bộ lọc nâng cao" className="flex items-center justify-center rounded-md bg-slate-200 p-2 text-slate-600 hover:bg-slate-300 transition-colors">
@@ -389,9 +302,47 @@ export const TranscriptReview = () => {
                 </button>
               </div>
             </div>
-
-            {/* User Menu */}
             <UserMenu username={username} onLogout={handleLogout} />
+          </div>
+        </div>
+
+        {/* COLLECTION SELECTOR */}
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <Database className="h-5 w-5 shrink-0 text-blue-600" />
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Collection đang gán nhãn</span>
+            <span className="text-xs text-slate-400 mt-0.5">Chọn dataset để labeling</span>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            {collectionsLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {collections.map((col) => (
+                  <button
+                    key={col.name}
+                    onClick={() => handleCollectionChange(col.name)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-all",
+                      selectedCollection === col.name
+                        ? "border-blue-500 bg-blue-600 text-white shadow-sm"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                    )}
+                  >
+                    <span>{col.name}</span>
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                      selectedCollection === col.name ? "bg-blue-500 text-white" : "bg-slate-200 text-slate-600"
+                    )}>
+                      {col.count.toLocaleString()}
+                    </span>
+                  </button>
+                ))}
+                {collections.length === 0 && (
+                  <span className="text-sm text-slate-400 italic">Chưa có collection nào. Hãy import CSV trước.</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -419,7 +370,7 @@ export const TranscriptReview = () => {
             <div className="text-center justify-center">STT</div>
             <div className="text-center justify-center">NỘI DUNG</div>
             <div className="text-center justify-center">KẾT QUẢ AI</div>
-            <div className="text-center justify-center">NGƯỜI DÙNG XÁC NHẬN </div>
+            <div className="text-center justify-center">NGƯỜI DÙNG XÁC NHẬN</div>
             <div className="text-center justify-center">GHI CHÚ</div>
             <div className="text-center justify-center">HÀNH ĐỘNG</div>
           </div>
@@ -430,72 +381,53 @@ export const TranscriptReview = () => {
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
               </div>
             )}
-
             {!loading && data.length === 0 ? (
               <div className="p-8 text-center text-slate-500">Không có đoạn nội dung nào khớp với bộ lọc của bạn.</div>
             ) : (
               data.map((segment, index) => {
                 const isActive = index === activeIndex;
                 const isLabeled = segment.is_labeled || !!pendingUpdates[segment.id];
-
                 let borderColor = 'border-l-slate-300';
                 if (segment.sentiment === 'negative') borderColor = 'border-l-red-500';
                 if (segment.sentiment === 'positive') borderColor = 'border-l-green-400';
-
                 return (
-                  <div
-                    key={segment.id}
-                    onClick={() => setActiveIndex(index)}
+                  <div key={segment.id} onClick={() => setActiveIndex(index)}
                     className={cn(
                       "relative grid grid-cols-[60px_1fr_160px_220px_160px_140px] gap-6 items-center rounded-lg p-4 py-8 shadow-sm transition-all border border-l-[3px] cursor-pointer",
                       borderColor,
-                      isActive
-                        ? "border-blue-300 bg-blue-50/60 shadow-md ring-1 ring-blue-200"
-                        : isLabeled
-                          ? "border-slate-100 bg-green-50/40 hover:shadow-md"
-                          : "border-slate-100 bg-white hover:shadow-md"
+                      isActive ? "border-blue-300 bg-blue-50/60 shadow-md ring-1 ring-blue-200"
+                        : isLabeled ? "border-slate-100 bg-green-50/40 hover:shadow-md"
+                        : "border-slate-100 bg-white hover:shadow-md"
                     )}
                   >
-                    {/* # Column */}
                     <div className="text-center font-medium text-slate-500 text-sm">
                       <div className="flex flex-col items-center gap-1">
                         {isLabeled && <CheckCircle2 className="h-4 w-4 text-green-500" />}
                         <span className="text-sm font-bold">{index + 1}</span>
                       </div>
                     </div>
-
-                    {/* Content Column */}
                     <div className="pr-4">
                       <p className="text-[15px] leading-relaxed text-slate-900">{segment.text}</p>
-                      {segment.confidence != null && (
+                      {segment.confidence != null && segment.confidence > 0 && (
                         <span className="mt-2 inline-block text-[11px] text-slate-400 font-mono">
                           Confidence: {(segment.confidence * 100).toFixed(0)}%
                         </span>
                       )}
                     </div>
-
-                    {/* AI Intelligence Column */}
                     <div className="flex flex-col items-center gap-2 border-l border-slate-100 px-2 h-full justify-center text-center">
                       <SentimentBadge sentiment={segment.sentiment} />
                       <span className="text-sm font-medium text-slate-900 mt-1">{getAspectLabel(segment.aspect)}</span>
                     </div>
-
-                    {/* User Verification Column */}
                     <div className="flex flex-col gap-3 px-2" onClick={e => e.stopPropagation()}>
                       <div className="flex w-full items-stretch rounded bg-slate-100 p-1 text-sm shadow-inner">
                         {SENTIMENTS.map(s => (
-                          <button
-                            key={s.value}
+                          <button key={s.value}
                             onClick={() => handleUserUpdate(segment.id, { user_sentiment: s.value, note: 'Đã check tay' })}
                             className={cn(
                               "flex-1 flex items-center justify-center rounded py-1.5 px-1 text-center font-semibold transition-all uppercase text-[10px]",
-                              segment.user_sentiment === s.value
-                                ? `${s.color} text-white shadow-sm`
-                                : "text-slate-700 hover:bg-slate-200/50 hover:text-slate-900"
+                              segment.user_sentiment === s.value ? `${s.color} text-white shadow-sm` : "text-slate-700 hover:bg-slate-200/50 hover:text-slate-900"
                             )}
-                          >
-                            {s.label}
-                          </button>
+                          >{s.label}</button>
                         ))}
                       </div>
                       <div className="relative">
@@ -513,8 +445,6 @@ export const TranscriptReview = () => {
                         )}
                       </div>
                     </div>
-
-                    {/* Note Column */}
                     <div className="flex flex-col h-full" onClick={e => e.stopPropagation()}>
                       <textarea
                         className="w-full flex-1 resize-none rounded-md border-slate-300 bg-slate-50 p-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500"
@@ -523,25 +453,17 @@ export const TranscriptReview = () => {
                         onChange={(e) => handleUserUpdate(segment.id, { note: e.target.value })}
                       />
                     </div>
-
-                    {/* Actions Column */}
                     <div className="flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
-                      <button
-                        onClick={() => copyAiPrediction(segment)}
-                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors uppercase"
-                      >
+                      <button onClick={() => copyAiPrediction(segment)} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors uppercase">
                         <Copy className="h-3.5 w-3.5" />Sử dụng kết quả AI
                       </button>
                     </div>
-
-                    {/* Delete button  */}
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(segment.id); }}
                       className="absolute top-2 right-2 flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors border border-red-100"
                       title="Xóa segment"
                     >
-                      <Trash2 className="h-4 w-4" />
-                      Xóa
+                      <Trash2 className="h-4 w-4" />Xóa
                     </button>
                   </div>
                 );
@@ -556,38 +478,16 @@ export const TranscriptReview = () => {
             </span>
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               <button disabled={pagination.currentPage <= 1 || loading} onClick={() => syncAndNavigate(pagination.currentPage - 1)} className="flex h-8 w-8 items-center justify-center rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">&lt;</button>
-
               <div className="flex items-center gap-2">
                 <span className="text-slate-500 font-normal">Trang</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={pagination.totalPages || 1}
-                  value={pageInput}
+                <input type="number" min={1} max={pagination.totalPages || 1} value={pageInput}
                   onChange={(e) => setPageInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const p = parseInt(pageInput);
-                      if (!isNaN(p) && p >= 1 && p <= pagination.totalPages && p !== pagination.currentPage) {
-                        syncAndNavigate(p);
-                      } else {
-                        setPageInput(pagination.currentPage.toString());
-                      }
-                    }
-                  }}
-                  onBlur={() => {
-                    const p = parseInt(pageInput);
-                    if (!isNaN(p) && p >= 1 && p <= pagination.totalPages && p !== pagination.currentPage) {
-                      syncAndNavigate(p);
-                    } else {
-                      setPageInput(pagination.currentPage.toString());
-                    }
-                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { const p = parseInt(pageInput); if (!isNaN(p) && p >= 1 && p <= pagination.totalPages && p !== pagination.currentPage) syncAndNavigate(p); else setPageInput(pagination.currentPage.toString()); } }}
+                  onBlur={() => { const p = parseInt(pageInput); if (!isNaN(p) && p >= 1 && p <= pagination.totalPages && p !== pagination.currentPage) syncAndNavigate(p); else setPageInput(pagination.currentPage.toString()); }}
                   className="w-14 rounded-md border border-slate-300 py-1 text-center text-sm font-semibold text-blue-700 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <span className="text-slate-500 font-normal">/ {pagination.totalPages}</span>
               </div>
-
               <button disabled={pagination.currentPage >= pagination.totalPages || loading} onClick={() => syncAndNavigate(pagination.currentPage + 1)} className="flex h-8 w-8 items-center justify-center rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">&gt;</button>
             </div>
           </div>
@@ -600,19 +500,14 @@ export const TranscriptReview = () => {
         toast ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none",
         toast?.type === 'error' ? "bg-red-600" : "bg-green-600"
       )}>
-        {toast?.type === 'error'
-          ? <AlertTriangle className="h-4 w-4" />
-          : <CheckCircle2 className="h-4 w-4" />
-        }
+        {toast?.type === 'error' ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
         {toast?.message}
       </div>
 
       {/* Floating submit bar */}
       <div className={cn(
         "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-300",
-        Object.keys(pendingUpdates).length > 0
-          ? "translate-y-0 opacity-100 pointer-events-auto"
-          : "translate-y-4 opacity-0 pointer-events-none"
+        Object.keys(pendingUpdates).length > 0 ? "translate-y-0 opacity-100 pointer-events-auto" : "translate-y-4 opacity-0 pointer-events-none"
       )}>
         <div className="flex items-center gap-4 rounded-xl bg-slate-900 px-5 py-3 shadow-2xl border border-slate-700">
           <div className="flex items-center gap-2 text-sm text-slate-300">
@@ -622,9 +517,15 @@ export const TranscriptReview = () => {
           <div className="h-4 w-px bg-slate-600" />
           <button
             onClick={async () => { const ok = await syncPending(); if (ok) fetchData(pagination.currentPage); }}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-500 transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-blue-500 transition-colors"
           >
-            Gửi kết quả →
+            Lưu ngay
+          </button>
+          <button
+            onClick={() => { setPendingUpdates({}); fetchData(pagination.currentPage); }}
+            className="text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            Hủy
           </button>
         </div>
       </div>

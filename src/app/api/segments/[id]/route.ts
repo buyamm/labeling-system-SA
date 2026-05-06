@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-const COLLECTION = 'segments';
+const DEFAULT_COLLECTION = 'segments';
 
-// PATCH /api/segments/:id
+// PATCH /api/segments/:id?collection=<name>
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        const collectionName = req.nextUrl.searchParams.get('collection') || DEFAULT_COLLECTION;
+
         const db = await getDb();
-        const col = db.collection(COLLECTION);
+        const col = db.collection(collectionName);
         const body = await req.json();
 
         // Remove id from body if present
@@ -36,15 +38,17 @@ export async function PATCH(
     }
 }
 
-// DELETE /api/segments/:id
+// DELETE /api/segments/:id?collection=<name>
 export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        const collectionName = req.nextUrl.searchParams.get('collection') || DEFAULT_COLLECTION;
+
         const db = await getDb();
-        const col = db.collection(COLLECTION);
+        const col = db.collection(collectionName);
 
         const result = await col.deleteOne({ _id: new ObjectId(id) });
 

@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Inject secrets at runtime — never hardcode here.
+      # Copy .env.local to .env.production and reference it:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DB=${MONGODB_DB:-labeling_db}
+    restart: unless-stopped

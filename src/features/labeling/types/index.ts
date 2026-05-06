@@ -1,21 +1,17 @@
 export type Sentiment = 'negative' | 'neutral' | 'positive';
 
 export type AspectType =
-  | 'Teaching_Skill'
-  | 'Knowledge'
-  | 'Experience'
-  | 'Behavior'
-  | 'Support'
-  | 'Curriculum'
-  | 'Materials'
-  | 'Workload'
-  | 'Assignments'
-  | 'Grading'
-  | 'Exams'
-  | 'Classroom'
-  | 'Platforms'
-  | 'General'
-  | 'Recommendation';
+  | 'ky_nang_giang_day'
+  | 'kinh_nghiem'
+  | 'hanh_vi'
+  | 'bai_tap'
+  | 'cham_diem'
+  | 'cung_cap_tai_lieu'
+  | 'kien_thuc'
+  | 'chuong_trinh_hoc'
+  | 'thiet_bi_day_hoc'
+  | 'de_xuat'
+  | 'noi_chung';
 
 export interface ContentType {
   id: string;
@@ -45,4 +41,9 @@ export interface PaginatedResponse<T> {
   next: string | null;
   previous: string | null;
   results: T[];
+}
+
+export interface CollectionInfo {
+  name: string;
+  count: number;
 }
