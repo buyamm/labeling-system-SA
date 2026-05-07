@@ -47,3 +47,46 @@ export interface CollectionInfo {
   name: string;
   count: number;
 }
+
+export interface StatsResponse {
+  collection: string;
+  total_labeled: number;
+  sentiment_match: number;
+  sentiment_mismatch: number;
+  aspect_match: number;
+  aspect_mismatch: number;
+  both_match: number;
+  either_mismatch: number;
+  sentiment_confusion: Record<string, number>;
+  aspect_confusion: Record<string, number>;
+  aspect_mismatch_breakdown: Record<string, number>;
+  sentiment_mismatch_breakdown: Record<string, number>;
+  mismatches: MismatchRow[];
+  /** Only present when collection === '__all__' */
+  per_collection?: CollectionSummary[];
+}
+
+export interface MismatchRow {
+  id: string;
+  text: string;
+  collection: string;
+  ai_sentiment: string | null;
+  user_sentiment: string | null;
+  ai_aspect: string | null;
+  user_aspect: string | null;
+  sentiment_match: boolean;
+  aspect_match: boolean;
+  updated_at: string;
+}
+
+export interface CollectionSummary {
+  name: string;
+  total_labeled: number;
+  sentiment_match: number;
+  sentiment_mismatch: number;
+  aspect_match: number;
+  aspect_mismatch: number;
+  both_match: number;
+  either_mismatch: number;
+  agreement_rate: number;
+}

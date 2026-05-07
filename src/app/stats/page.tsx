@@ -1,13 +1,13 @@
 "use client";
 import React from "react";
 import { NavBar } from "@/components/layouts/NavBar";
-import { CSVImport } from "@/features/labeling";
+import { Statistics } from "@/features/labeling/components/Statistics";
 
-export default function ImportPage() {
+export default function StatsPage() {
     return (
         <main>
             <NavBar />
-            <CSVImport />
+            <Statistics />
         </main>
     );
 }

@@ -1,4 +1,4 @@
-import { SegmentResult, PaginatedResponse, CollectionInfo } from '../types';
+import { SegmentResult, PaginatedResponse, CollectionInfo, StatsResponse } from '../types';
 
 // ---------------------------------------------------------------------------
 // API client — calls Next.js API routes which talk to MongoDB Atlas
@@ -93,5 +93,14 @@ export const collectionApi = {
       method: 'POST',
       body: JSON.stringify({ collection, csvText }),
     });
+  },
+
+  /** GET /api/stats — mismatch statistics for labeled data */
+  getStats: (collection: string, page = 1, limit = 50): Promise<StatsResponse & {
+    mismatch_total: number;
+    mismatch_page: number;
+    mismatch_total_pages: number;
+  }> => {
+    return apiFetch(`/api/stats?collection=${encodeURIComponent(collection)}&page=${page}&limit=${limit}`);
   },
 };

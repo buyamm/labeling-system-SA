@@ -1,4 +1,5 @@
 export * from './components/TranscriptReview';
 export * from './components/CSVImport';
+export * from './components/Statistics';
 export * from './types';
 export * from './api/segmentApi';
